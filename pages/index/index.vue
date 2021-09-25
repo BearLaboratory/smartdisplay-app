@@ -10,7 +10,7 @@
 		<view class="" v-show="selectedItem.value==1">
 
 			<view class="logo-box">
-				<image src="../../static/tempturemain.jpg" mode="widthFix"></image>
+				<image src="../../static/tianqipic.png" mode="widthFix"></image>
 			</view>
 
 			<view class="form-box">
@@ -42,7 +42,7 @@
 		<!-- 粉丝计数器模式 -->
 		<view class="" v-show="selectedItem.value==2">
 			<view class="logo-box">
-				<image src="../../static/tempturemain.jpg" mode="widthFix"></image>
+				<image src="../../static/fensipic.png" mode="widthFix"></image>
 			</view>
 
 			<view class="form-box">
@@ -50,24 +50,24 @@
 					<text>设置基本信息</text>
 					<u-line color="#c8c9cc" margin="10rpx 0" />
 				</view>
-				<u-form :model="temptureObject" ref="uForm">
-					<u-form-item label="slogan" label-width="180">
-						<u-input v-model="temptureObject.slogan" />
-					</u-form-item>
+				<u-form :model="fansObject" ref="uForm">
 					<u-form-item label="WiFi名称" label-width="180" prop="ssid">
-						<u-input v-model="temptureObject.ssid" />
+						<u-input v-model="fansObject.ssid" />
 					</u-form-item>
 					<u-form-item label="WiFi密码" label-width="180" prop="password">
-						<u-input v-model="temptureObject.password" type="password" />
+						<u-input v-model="fansObject.password" type="password" />
 					</u-form-item>
-					<u-form-item label="天气appId" label-width="180" prop="appId">
-						<u-input v-model="temptureObject.appId" />
+					<u-form-item label="B站vmId" label-width="180" prop="vmId">
+						<u-input v-model="fansObject.vmId" />
 					</u-form-item>
-					<u-form-item label="天气secret" label-width="180" prop="secret">
-						<u-input v-model="temptureObject.secret" />
+					<u-form-item label="百家号appId" label-width="180" prop="appId">
+						<u-input v-model="fansObject.appId" />
+					</u-form-item>
+					<u-form-item label="百家号token" label-width="180" prop="token">
+						<u-input v-model="fansObject.token" />
 					</u-form-item>
 
-					<u-button type="primary" @click="saveTemptureMode">保存</u-button>
+					<u-button type="primary" @click="saveFansMode">保存</u-button>
 				</u-form>
 			</view>
 		</view>
@@ -117,7 +117,8 @@
 			</view>
 		</u-popup>
 		<!-- select -->
-		<u-select v-model="selectShow" :list="selectList" @confirm="modeSelect"></u-select>
+		<u-select v-model="selectShow" :list="selectList" @confirm="modeSelect" :default-value="[selectedItem.value]">
+		</u-select>
 		<u-modal v-model="rebootConfirmShow" @confirm="rebootConfirm" ref="uModal" content="确定要重启系统吗?"
 			:show-cancel-button='true'></u-modal>
 		<u-modal v-model="clearConfirmShow" @confirm="clearConfirm" ref="uModal" content="确定要格式化系统吗?"
@@ -127,6 +128,9 @@
 
 <script>
 	import htzSignature from '@/components/htz-signature/htz-signature.vue'
+	import {
+		String2Ab
+	} from '../../utils/bleutil.js'
 	export default {
 		data() {
 			return {
@@ -151,7 +155,14 @@
 					ssid: '',
 					password: '',
 					appId: '',
-					secret: ''
+					token: ''
+				},
+				fansObject: {
+					ssid: '',
+					password: '',
+					vmId: '',
+					appId: '',
+					token: ''
 				},
 				rules: {
 					ssid: [{
@@ -173,6 +184,16 @@
 						required: true,
 						message: 'SECRET',
 						trigger: ['change', 'blur'],
+					}],
+					token: [{
+						required: true,
+						message: 'token必填',
+						trigger: ['change', 'blur'],
+					}],
+					vmId: [{
+						required: true,
+						message: 'vmId必填',
+						trigger: ['change', 'blur'],
 					}]
 				}
 			}
@@ -182,6 +203,13 @@
 		},
 		created() {
 			this.bleConnected = this.$store.state.bleConnected
+			this.selectList.forEach(item => {
+				if (item.value == this.$store.state.readedObject.type) {
+					this.selectedItem = item
+				}
+
+			})
+
 		},
 		computed: {
 
@@ -267,11 +295,76 @@
 				this.$refs.uForm.validate(valid => {
 					if (valid) {
 						console.log('验证通过');
-						this.temptureObject.type = 2
+						this.temptureObject.type = 1
 						let jsonString = JSON.stringify(this.temptureObject)
 						let times = jsonString.length / 20
 
 
+
+					} else {
+						console.log('验证失败');
+					}
+				})
+			},
+			saveFansMode() {
+				var that = this
+				this.$refs.uForm.validate(valid => {
+					if (valid) {
+						uni.showLoading({
+							title: '数据发送中'
+						})
+						this.fansObject.type = 2
+						let jsonString = JSON.stringify(this.fansObject)
+						console.log('完整原始命令', jsonString)
+						console.log('命令应该下发次数', jsonString.length)
+
+						let index = 0
+						let ii = setInterval(function() {
+							if (index == jsonString.length) {
+								clearInterval(ii)
+							} else {
+								let str = jsonString.substring(index, index + 1)
+								console.log('第' + index + '次', str)
+								uni.writeBLECharacteristicValue({
+									deviceId: that.$store.state.selectedBluetooth.deviceId,
+									serviceId: that.$store.state.mainServiceId,
+									characteristicId: that.$store.state.configCharacteristicId,
+									value: String2Ab(str),
+									success(res) {
+										console.log('成功发送次数', index)
+										if (index == (jsonString.length - 1)) {
+											uni.hideLoading()
+										}
+									},
+									fail(res) {
+										console.log('下发错误', res)
+									}
+								})
+								index++
+							}
+
+						}, 200)
+
+
+						// for (let i = 0; i < jsonString.length; i++) {
+						// 	let str = jsonString.substring(i, i + 1)
+						// 	console.log('第' + i + '次', str)
+						// 	uni.writeBLECharacteristicValue({
+						// 		deviceId: that.$store.state.selectedBluetooth.deviceId,
+						// 		serviceId: that.$store.state.mainServiceId,
+						// 		characteristicId: that.$store.state.configCharacteristicId,
+						// 		value: String2Ab(str),
+						// 		success(res) {
+						// 			console.log('成功发送次数', i)
+						// 			if (i = (jsonString.length - 1)) {
+						// 				uni.hideLoading()
+						// 			}
+						// 		},
+						// 		fail(res) {
+						// 			console.log('下发错误', res)
+						// 		}
+						// 	})
+						// }
 
 					} else {
 						console.log('验证失败');

@@ -12,6 +12,7 @@ const store = new Vuex.Store({
 		mainServiceId: '71db3107-6be5-4c0b-ad8e-731df7069e62',
 		readCharacteristicId: '8b3aed0e-a5a0-4e7f-9965-d0f3d26a1b36',
 		rebootCharacteristicId: '2bbd7b92-5bc8-441c-a69a-5764d4f3d1a9',
+		configCharacteristicId: '2bbd7b92-5bc8-441c-a69a-5764d4f3d1a8',
 		readedObject: {}
 	},
 	mutations: {
