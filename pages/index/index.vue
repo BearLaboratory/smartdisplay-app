@@ -18,21 +18,21 @@
 					<text>设置基本信息</text>
 					<u-line color="#c8c9cc" margin="10rpx 0" />
 				</view>
-				<u-form :model="temptureObject" ref="uForm">
+				<u-form :model="temptureObject" ref="uForm1">
 					<u-form-item label="slogan" label-width="180">
-						<u-input v-model="temptureObject.slogan" />
+						<u-input v-model="temptureObject.slogan" :adjust-position="true" />
 					</u-form-item>
 					<u-form-item label="WiFi名称" label-width="180" prop="ssid">
-						<u-input v-model="temptureObject.ssid" />
+						<u-input v-model="temptureObject.ssid" :adjust-position="true" />
 					</u-form-item>
 					<u-form-item label="WiFi密码" label-width="180" prop="password">
-						<u-input v-model="temptureObject.password" type="password" />
+						<u-input v-model="temptureObject.password" type="password" :adjust-position="true" />
 					</u-form-item>
 					<u-form-item label="天气appId" label-width="180" prop="appId">
-						<u-input v-model="temptureObject.appId" />
+						<u-input v-model="temptureObject.appId" :adjust-position="true" />
 					</u-form-item>
 					<u-form-item label="天气secret" label-width="180" prop="secret">
-						<u-input v-model="temptureObject.secret" />
+						<u-input v-model="temptureObject.secret" :adjust-position="true" />
 					</u-form-item>
 
 					<u-button type="primary" @click="saveTemptureMode">保存</u-button>
@@ -51,20 +51,23 @@
 					<u-line color="#c8c9cc" margin="10rpx 0" />
 				</view>
 				<u-form :model="fansObject" ref="uForm">
+					<u-form-item label="频道名" label-width="180" prop="brand">
+						<u-input v-model="fansObject.brand" :adjust-position="true" />
+					</u-form-item>
 					<u-form-item label="WiFi名称" label-width="180" prop="ssid">
-						<u-input v-model="fansObject.ssid" />
+						<u-input v-model="fansObject.ssid" :adjust-position="true" />
 					</u-form-item>
 					<u-form-item label="WiFi密码" label-width="180" prop="password">
-						<u-input v-model="fansObject.password" type="password" />
+						<u-input v-model="fansObject.password" type="password" :adjust-position="true" />
 					</u-form-item>
 					<u-form-item label="B站vmId" label-width="180" prop="vmId">
-						<u-input v-model="fansObject.vmId" />
+						<u-input v-model="fansObject.vmId" :adjust-position="true" />
 					</u-form-item>
 					<u-form-item label="百家号appId" label-width="180" prop="appId">
-						<u-input v-model="fansObject.appId" />
+						<u-input v-model="fansObject.appId" :adjust-position="true" />
 					</u-form-item>
 					<u-form-item label="百家号token" label-width="180" prop="token">
-						<u-input v-model="fansObject.token" />
+						<u-input v-model="fansObject.token" :adjust-position="true" />
 					</u-form-item>
 
 					<u-button type="primary" @click="saveFansMode">保存</u-button>
@@ -129,7 +132,8 @@
 <script>
 	import htzSignature from '@/components/htz-signature/htz-signature.vue'
 	import {
-		String2Ab
+		String2Ab,
+		ch2Unicdoe
 	} from '../../utils/bleutil.js'
 	export default {
 		data() {
@@ -165,6 +169,11 @@
 					token: ''
 				},
 				rules: {
+					brand: [{
+						required: true,
+						message: '请输入频道名称',
+						trigger: ['change', 'blur'],
+					}],
 					ssid: [{
 						required: true,
 						message: '请输入WiFi名称',
@@ -219,6 +228,7 @@
 		},
 		onReady: function(e) {
 			this.$refs.uForm.setRules(this.rules);
+			this.$refs.uForm1.setRules(this.rules);
 		},
 		watch: {
 			'$store.state.bleConnected': function() {
@@ -292,14 +302,42 @@
 				this.popupShow = false
 			},
 			saveTemptureMode() {
-				this.$refs.uForm.validate(valid => {
+				this.$refs.uForm1.validate(valid => {
+					var that = this
 					if (valid) {
-						console.log('验证通过');
-						this.temptureObject.type = 1
-						let jsonString = JSON.stringify(this.temptureObject)
-						let times = jsonString.length / 20
+						uni.showLoading({
+							title: '数据发送中'
+						})
+						let jsonString = String
+							.raw`{"slogan":"${ch2Unicdoe(this.temptureObject.slogan)}","ssid":"${this.temptureObject.ssid}","password":"${this.temptureObject.password}","appId":"${this.temptureObject.appId}","secret":"${this.temptureObject.secret}","type":1}`
+						console.log('原始数据', jsonString)
+						let times = Math.floor(jsonString.length / 20)
+						let index = 0
+						let ii2 = setInterval(function() {
+							if (index > times) {
+								clearInterval(ii2)
+							} else {
+								let str = jsonString.substring(index * 20, index * 20 + 20)
+								console.log('第' + index + '次', str)
+								uni.writeBLECharacteristicValue({
+									deviceId: that.$store.state.selectedBluetooth.deviceId,
+									serviceId: that.$store.state.mainServiceId,
+									characteristicId: that.$store.state.configCharacteristicId,
+									value: String2Ab(str),
+									success(res) {
+										console.log('成功发送次数', index)
+										if (index == times) {
+											uni.hideLoading()
+										}
+									},
+									fail(res) {
+										console.log('下发错误', res)
+									}
+								})
+								index++
+							}
 
-
+						}, 400)
 
 					} else {
 						console.log('验证失败');
@@ -313,17 +351,17 @@
 						uni.showLoading({
 							title: '数据发送中'
 						})
-						this.fansObject.type = 2
-						let jsonString = JSON.stringify(this.fansObject)
-						console.log('完整原始命令', jsonString)
-						console.log('命令应该下发次数', jsonString.length)
+						let jsonString = String
+							.raw`{"ssid":"${this.fansObject.ssid}","password":"${this.fansObject.password}","vmId":"${this.fansObject.vmId}","appId":"${this.fansObject.appId}","token":"${this.fansObject.token}","brand":"${ch2Unicdoe(this.fansObject.brand)}","type":2}`
 
+						console.log('完整原始命令', jsonString)
+						let times = Math.floor(jsonString.length / 20)
 						let index = 0
 						let ii = setInterval(function() {
-							if (index == jsonString.length) {
+							if (index > times) {
 								clearInterval(ii)
 							} else {
-								let str = jsonString.substring(index, index + 1)
+								let str = jsonString.substring(index * 20, index * 20 + 20)
 								console.log('第' + index + '次', str)
 								uni.writeBLECharacteristicValue({
 									deviceId: that.$store.state.selectedBluetooth.deviceId,
@@ -332,7 +370,7 @@
 									value: String2Ab(str),
 									success(res) {
 										console.log('成功发送次数', index)
-										if (index == (jsonString.length - 1)) {
+										if (index == times) {
 											uni.hideLoading()
 										}
 									},
@@ -343,28 +381,7 @@
 								index++
 							}
 
-						}, 200)
-
-
-						// for (let i = 0; i < jsonString.length; i++) {
-						// 	let str = jsonString.substring(i, i + 1)
-						// 	console.log('第' + i + '次', str)
-						// 	uni.writeBLECharacteristicValue({
-						// 		deviceId: that.$store.state.selectedBluetooth.deviceId,
-						// 		serviceId: that.$store.state.mainServiceId,
-						// 		characteristicId: that.$store.state.configCharacteristicId,
-						// 		value: String2Ab(str),
-						// 		success(res) {
-						// 			console.log('成功发送次数', i)
-						// 			if (i = (jsonString.length - 1)) {
-						// 				uni.hideLoading()
-						// 			}
-						// 		},
-						// 		fail(res) {
-						// 			console.log('下发错误', res)
-						// 		}
-						// 	})
-						// }
+						}, 400)
 
 					} else {
 						console.log('验证失败');
@@ -423,7 +440,7 @@
 		display: flex;
 		position: absolute;
 		top: 3vh;
-		right: 0;
+		right: 3vw;
 		background-color: #007AFF;
 	}
 
